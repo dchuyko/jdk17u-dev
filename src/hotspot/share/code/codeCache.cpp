@@ -143,6 +143,7 @@ class CodeBlob_sizes {
 #define FOR_ALL_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _heaps->begin(); heap != _heaps->end(); ++heap)
 #define FOR_ALL_NMETHOD_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _nmethod_heaps->begin(); heap != _nmethod_heaps->end(); ++heap)
 #define FOR_ALL_ALLOCABLE_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _allocable_heaps->begin(); heap != _allocable_heaps->end(); ++heap)
+#define FOR_ALL_COLD_HEAPS(heap) for (GrowableArrayIterator<CodeHeap*> heap = _cold_heaps->begin(); heap != _cold_heaps->end(); ++heap)
 
 // Iterate over all CodeBlobs (cb) on the given CodeHeap
 #define FOR_ALL_BLOBS(cb, heap) for (CodeBlob* cb = first_blob(heap); cb != NULL; cb = next_blob(heap, cb))
@@ -157,6 +158,7 @@ GrowableArray<CodeHeap*>* CodeCache::_heaps = new(ResourceObj::C_HEAP, mtCode) G
 GrowableArray<CodeHeap*>* CodeCache::_compiled_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
 GrowableArray<CodeHeap*>* CodeCache::_nmethod_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
 GrowableArray<CodeHeap*>* CodeCache::_allocable_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
+GrowableArray<CodeHeap*>* CodeCache::_cold_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
 
 void CodeCache::check_heap_size(const char* name, size_t item, size_t required) {
   if (item < required) {
@@ -421,6 +423,9 @@ void CodeCache::add_heap(CodeHeap* heap) {
   }
   if (code_blob_type_accepts_allocable(type)) {
     _allocable_heaps->insert_sorted<code_heap_compare>(heap);
+  }
+  if (code_blob_type_accepts_cold(type)) {
+    _cold_heaps->insert_sorted<code_heap_compare>(heap);
   }
 }
 
@@ -897,7 +902,7 @@ address CodeCache::high_bound(int code_blob_type) {
 
 size_t CodeCache::capacity() {
   size_t cap = 0;
-  FOR_ALL_ALLOCABLE_HEAPS(heap) {
+  FOR_ALL_COLD_HEAPS(heap) {
     cap += (*heap)->capacity();
   }
   return cap;
@@ -910,7 +915,7 @@ size_t CodeCache::unallocated_capacity(int code_blob_type) {
 
 size_t CodeCache::unallocated_capacity() {
   size_t unallocated_cap = 0;
-  FOR_ALL_ALLOCABLE_HEAPS(heap) {
+  FOR_ALL_COLD_HEAPS(heap) {
     unallocated_cap += (*heap)->unallocated_capacity();
   }
   return unallocated_cap;
@@ -918,7 +923,7 @@ size_t CodeCache::unallocated_capacity() {
 
 size_t CodeCache::max_capacity() {
   size_t max_cap = 0;
-  FOR_ALL_ALLOCABLE_HEAPS(heap) {
+  FOR_ALL_COLD_HEAPS(heap) {
     max_cap += (*heap)->max_capacity();
   }
   return max_cap;

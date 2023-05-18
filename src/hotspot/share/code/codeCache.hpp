@@ -90,6 +90,7 @@ class CodeCache : AllStatic {
   static GrowableArray<CodeHeap*>* _compiled_heaps;
   static GrowableArray<CodeHeap*>* _nmethod_heaps;
   static GrowableArray<CodeHeap*>* _allocable_heaps;
+  static GrowableArray<CodeHeap*>* _cold_heaps;
 
   static address _low_bound;                            // Lower bound of CodeHeap addresses
   static address _high_bound;                           // Upper bound of CodeHeap addresses
@@ -242,6 +243,10 @@ class CodeCache : AllStatic {
     return type <= CodeBlobType::All;
   }
 
+  static bool code_blob_type_accepts_cold(int type) {
+    // Exclude NonNmethod and ExtraHot
+    return type == CodeBlobType::All || type != CodeBlobType::MethodExtraHot;
+  }
 
   // Returns the CodeBlobType for the given compilation level
   static int get_code_blob_type(int comp_level) {
