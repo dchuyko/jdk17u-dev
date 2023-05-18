@@ -1421,6 +1421,7 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
     return NULL;
   }
 
+  mark_method_count_calls(method, comp_level, hot_count, directive);
 #if INCLUDE_JVMCI
   if (comp->is_jvmci() && !JVMCI::can_initialize_JVMCI()) {
     return NULL;
@@ -1585,7 +1586,27 @@ bool CompileBroker::compilation_is_in_queue(const methodHandle& method) {
   return method->queued_for_compilation();
 }
 
-// ------------------------------------------------------------------
+// Set count_calls flag for methods with option CountCalls
+void CompileBroker::mark_method_count_calls(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+  (void) hot_count;
+
+  if (comp_level != CompLevel_full_optimization || method->is_native()) {
+    return;
+  }
+
+  bool count_calls = directive->CountCallsOption;
+
+  if (!count_calls) {
+    count_calls = (CompilerOracle::has_option_value(method, CompileCommand::CountCalls, count_calls) && count_calls);
+  }
+
+  if (count_calls) {
+    ResourceMark rm;
+    // Clear the counter on each re-compilation
+    method->set_compiled_invocation_count(0);
+    method->set_count_calls();
+  }
+}// ------------------------------------------------------------------
 // CompileBroker::compilation_is_prohibited
 //
 // See if this compilation is not allowed.

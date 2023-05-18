@@ -58,6 +58,9 @@ enum {
   JVM_ACC_IS_OBSOLETE             = 0x00020000,     // RedefineClasses() has made method obsolete
   JVM_ACC_IS_PREFIXED_NATIVE      = 0x00040000,     // JVMTI has prefixed this native method
   JVM_ACC_ON_STACK                = 0x00080000,     // RedefineClasses() was used on the stack
+  JVM_ACC_RESERVED_DONT_USE1      = 0x00001000,     //
+  JVM_ACC_COUNT_CALLS_CANDIDATE   = 0x00002000,     // Method counts compiled calls on entry
+  JVM_ACC_RESERVED_CAN_USE4       = 0x00004000,     //
   JVM_ACC_IS_DELETED              = 0x00008000,     // RedefineClasses() has deleted this method
 
   // Klass* flags
@@ -76,6 +79,7 @@ enum {
 
   JVM_ACC_PROMOTED_FLAGS          = 0x00200000,     // flags promoted from methods to the holding klass
 
+  JVM_ACC_COUNT_CALLS            = JVM_ACC_COUNT_CALLS_CANDIDATE,
   // field flags
   // Note: these flags must be defined in the low order 16 bits because
   // InstanceKlass only stores a ushort worth of information from the
@@ -164,6 +168,9 @@ class AccessFlags {
   void set_is_being_redefined()         { atomic_set_bits(JVM_ACC_IS_BEING_REDEFINED); }
   void clear_is_being_redefined()       { atomic_clear_bits(JVM_ACC_IS_BEING_REDEFINED); }
 
+  bool is_count_calls() const          { return (_flags & JVM_ACC_COUNT_CALLS) != 0; } // EHT
+  void set_count_calls()               { atomic_set_bits(JVM_ACC_COUNT_CALLS); }
+  void clear_count_calls()             { atomic_clear_bits(JVM_ACC_COUNT_CALLS); }
   // field flags
   bool is_field_access_watched() const  { return (_flags & JVM_ACC_FIELD_ACCESS_WATCHED) != 0; }
   bool is_field_modification_watched() const

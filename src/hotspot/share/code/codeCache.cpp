@@ -1225,6 +1225,7 @@ void CodeCache::make_marked_nmethods_not_entrant() {
   while(iter.next()) {
     CompiledMethod* nm = iter.method();
     if (nm->is_marked_for_deoptimization()) {
+      nm->method()->clear_method_flags();
       nm->make_not_entrant();
     }
   }
@@ -1593,6 +1594,26 @@ void CodeCache::print_codelist(outputStream* st) {
                  cm->compile_id(), cm->comp_level(), cm->get_state(),
                  method_name,
                  (intptr_t)cm->header_begin(), (intptr_t)cm->code_begin(), (intptr_t)cm->code_end());
+  }
+}
+
+void CodeCache::print_codelist_with_counters(outputStream* st, bool reset_counters) {
+  MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+
+  CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
+  while (iter.next()) {
+    CompiledMethod* cm = iter.method();
+    ResourceMark rm;
+    char* method_name = cm->method()->name_and_sig_as_C_string();
+    st->print("%d %d %d %6d %8ld ",
+               cm->compile_id(), cm->comp_level(), cm->get_state(),
+               cm->method()->interpreter_invocation_count(), cm->method()->compiled_invocation_count());
+    st->print_cr("%s [" INTPTR_FORMAT ", " INTPTR_FORMAT " - " INTPTR_FORMAT "]",
+                 method_name,
+                 (intptr_t)cm->header_begin(), (intptr_t)cm->code_begin(), (intptr_t)cm->code_end());
+    if (reset_counters) {
+      cm->method()->set_compiled_invocation_count(0);
+    }
   }
 }
 

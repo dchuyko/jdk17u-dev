@@ -197,6 +197,7 @@ class CodeCache : AllStatic {
 
   // Dcmd (Diagnostic commands)
   static void print_codelist(outputStream* st);
+  static void print_codelist_with_counters(outputStream* st, bool reset_counters);
   static void print_layout(outputStream* st);
 
   // The full limits of the codeCache

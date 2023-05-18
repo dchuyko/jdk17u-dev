@@ -634,6 +634,7 @@ void Parse::do_call() {
   record_profiled_arguments_for_speculation(cg->method(), bc());
 
 #ifndef PRODUCT
+  // In product, count only on the method entry
   // bump global counters for calls
   count_compiled_calls(/*at_method_entry*/ false, cg->is_inline());
 
@@ -1069,6 +1070,18 @@ void Parse::count_compiled_calls(bool at_method_entry, bool is_inline) {
       case Bytecodes::_invokespecial:   increment_counter(SharedRuntime::nof_static_calls_addr()); break;
       default: fatal("unexpected call bytecode");
       }
+    }
+  }
+}
+#else
+void Parse::count_compiled_calls(bool at_method_entry, bool is_inline) {
+  if (CountCompiledCalls || method()->get_Method()->is_count_calls()) {
+    if (at_method_entry) {
+      // bump invocation counter if top method (for statistics)
+      const TypePtr* addr_type = TypeMetadataPtr::make(method());
+      Node* adr1 = makecon(addr_type);
+      Node* adr2 = basic_plus_adr(adr1, adr1, in_bytes(Method::compiled_invocation_counter_offset()));
+      increment_counter(adr2);
     }
   }
 }

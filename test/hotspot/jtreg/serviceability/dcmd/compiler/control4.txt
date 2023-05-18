@@ -1,0 +1,11 @@
+[
+ {
+  match: "java/lang/String.startsWith",
+  c1 : {
+    Enable: false
+  },
+  c2 : {
+    CountCalls: true
+  }
+ }
+]

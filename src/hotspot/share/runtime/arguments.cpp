@@ -3922,6 +3922,12 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
       UseCounterDecay = false;
     }
   }
+#else
+  if (CountCompiledCalls) {
+    //EHT: UseCounterDecay flag seems to be unused,
+    // but set it anyway. For product do it silently.
+    UseCounterDecay = false;
+  }
 #endif // PRODUCT
 
   if (ScavengeRootsInCode == 0) {

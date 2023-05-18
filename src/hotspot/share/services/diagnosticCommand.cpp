@@ -825,8 +825,22 @@ void CompileQueueDCmd::execute(DCmdSource source, TRAPS) {
   VMThread::execute(&printCompileQueueOp);
 }
 
+CodeListDCmd::CodeListDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _show_counters("-c", "Print invocation counters.", "BOOLEAN", false, "false"),
+  _reset_counters("-r", "Print and reset invocation counters.", "BOOLEAN", false, "false") {
+
+  _dcmdparser.add_dcmd_option(&_show_counters);
+  _dcmdparser.add_dcmd_option(&_reset_counters);
+}
+
 void CodeListDCmd::execute(DCmdSource source, TRAPS) {
-  CodeCache::print_codelist(output());
+  if (_show_counters.value() || _reset_counters.value()) {
+    CodeCache::print_codelist_with_counters(output(), _reset_counters.value());
+  }
+  else {
+    CodeCache::print_codelist(output());
+  }
 }
 
 void CodeCacheDCmd::execute(DCmdSource source, TRAPS) {

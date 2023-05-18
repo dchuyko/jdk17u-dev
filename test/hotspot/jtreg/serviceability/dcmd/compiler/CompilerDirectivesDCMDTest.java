@@ -28,7 +28,7 @@
  * @modules java.base/jdk.internal.misc
  *          java.compiler
  *          java.management
- * @run testng/othervm CompilerDirectivesDCMDTest
+ * @run testng/othervm -XX:+CountCompiledCalls CompilerDirectivesDCMDTest
  * @summary Test of diagnostic command
  */
 
@@ -63,6 +63,12 @@ public class CompilerDirectivesDCMDTest {
 
         filename = System.getProperty("test.src", ".") + File.separator + "control3.txt";
         testForcedDeopt(executor);
+
+        if (Platform.isServer() && !Platform.isEmulatedClient()) {
+          // Compiled calls counter available for c2 only
+          filename = System.getProperty("test.src", ".") + File.separator + "control4.txt";
+          testCountCompiledCalls(executor);
+        }
     }
 
     public static void testPrintCommand(CommandExecutor executor) {
@@ -100,6 +106,29 @@ public class CompilerDirectivesDCMDTest {
           }
         }
     }
+
+    public static void testCountCompiledCalls(CommandExecutor executor) {
+        OutputAnalyzer output;
+        executor.execute("Compiler.directives_add " + filename + " -d");
+        output = executor.execute("Compiler.codelist -c");
+        ArrayList<String> selected = findPattern(output, ".*java.lang.String.startsWith\\(.*");
+        int compiled_methods = 0;
+        for (String line : selected) {
+            String fields[] = line.split("\\s+");
+            int level = Integer.valueOf(fields[1]); // get compilation level, should not be 4 (c2)
+            long invocations = Long.valueOf(fields[4]);
+            if (level == 4) {
+                compiled_methods += 1;
+                if (invocations == 0) {
+                    System.err.println(line);
+                    Assert.fail("Expected non zero compiled inocation count for j.l.s.startsWith");
+                }
+            }
+        }
+        if (compiled_methods == 0) {
+            Assert.fail("Compiled calls count for j.l.s.startsWith should not be zero");
+        }
+     }
 
     public static void testAddAndRemoveCommand(CommandExecutor executor, boolean force_deopt) {
         OutputAnalyzer output;

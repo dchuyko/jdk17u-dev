@@ -1182,7 +1182,7 @@ const intx ObjectAlignmentInBytes = 8;
           range(-1, 64)                                                     \
                                                                             \
   /* statistics */                                                          \
-  develop(bool, CountCompiledCalls, false,                                  \
+  product(bool, CountCompiledCalls, false,                                  \
           "Count method invocations")                                       \
                                                                             \
   notproduct(bool, ICMissHistogram, false,                                  \

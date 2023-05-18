@@ -601,9 +601,12 @@ public:
 };
 #endif // LINUX
 
-class CodeListDCmd : public DCmd {
+class CodeListDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _show_counters; // true if we whant to print counters
+  DCmdArgument<bool> _reset_counters; // true if we whant to reset counters after printing
 public:
-  CodeListDCmd(outputStream* output, bool heap) : DCmd(output, heap) {}
+  CodeListDCmd(outputStream* output, bool heap);
   static const char* name() {
     return "Compiler.codelist";
   }
