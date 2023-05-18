@@ -307,16 +307,17 @@ void CodeCache::initialize_heaps() {
   ReservedCodeSpace rs = reserve_heap_memory(cache_size);
 
   size_t offset = 0;
-  // Non-nmethods (stubs, adapters, ...)
-  ReservedSpace non_method_space = rs.partition(offset, non_nmethod_size);
-  offset += non_nmethod_size;
-  add_heap(non_method_space, "CodeHeap 'non-nmethods'", CodeBlobType::NonNMethod);
-
-  // Extra Hot methods
   if (ExtraHotCodeCache) {
+    // Extra Hot methods
     ReservedSpace extra_hot_space = rs.partition(offset, extra_hot_size);
     offset += extra_hot_size;
     add_heap(extra_hot_space, "CodeHeap 'extra-hot'", CodeBlobType::MethodExtraHot);
+  }
+  else {
+    // Non-nmethods (stubs, adapters, ...)
+    ReservedSpace non_method_space = rs.partition(offset, non_nmethod_size);
+    offset += non_nmethod_size;
+    add_heap(non_method_space, "CodeHeap 'non-nmethods'", CodeBlobType::NonNMethod);
   }
 
   // Tier 2 and tier 3 (profiled) methods
@@ -580,7 +581,8 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
                     (address)heap->high() - (address)heap->low_boundary());
     }
   }
-  print_trace("allocation", cb, size);
+
+  print_trace("allocation", cb, code_blob_type, size);
   return cb;
 }
 
@@ -1417,13 +1419,17 @@ void CodeCache::print_memory_overhead() {
   tty->print_cr("Segment map size:               " SSIZE_FORMAT "kB",  allocated_segments()/K); // 1 byte per segment
 }
 
-void CodeCache::print_trace(const char* event, CodeBlob* cb, int size) {
+void CodeCache::print_trace(const char* event, CodeBlob* cb, int cb_type, int size) {
   Log(codecache, heap) log;
   if (log.is_trace()) {
     ResourceMark rm;
     LogStream ls(log.trace());
     if (size == 0)  size = cb->size();
-    ls.print("CodeCache %s: addr: " INTPTR_FORMAT ", size: 0x%x", event, p2i(cb), size);
+    ls.print("CodeCache %s: ", event);
+    if (cb_type != CodeBlobType::NumTypes) {
+      ls.print("type: %d ", cb_type);
+    }
+    ls.print("addr: " INTPTR_FORMAT ", size: 0x%x", p2i(cb), size);
     FOR_ALL_HEAPS(heap) {
       CodeHeap* curr_heap = *heap;
       if (curr_heap->contains_blob(cb)) {

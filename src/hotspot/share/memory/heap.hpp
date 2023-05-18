@@ -205,10 +205,13 @@ class CodeHeap : public CHeapObj<mtCode> {
 
   // Returns true if the CodeHeap contains CodeBlobs of the given type
   bool accepts(int code_blob_type) const {
-    if (code_blob_type == CodeBlobType::MethodExtraHot) {
-      return (_code_blob_type == code_blob_type); // EHT: Require explicit match
+    // EHT2: Redirect EHT to NonNmethod segment
+    if (ExtraHotCodeCache) {
+      if (code_blob_type == CodeBlobType::MethodExtraHot || code_blob_type == CodeBlobType::NonNMethod) {
+        return (_code_blob_type == CodeBlobType::MethodExtraHot);
+      }
     }
-    return (_code_blob_type == CodeBlobType::All) || (_code_blob_type == code_blob_type);
+    return (_code_blob_type == code_blob_type) || (_code_blob_type == CodeBlobType::All);
   }
 
   int code_blob_type() const                     { return _code_blob_type; }

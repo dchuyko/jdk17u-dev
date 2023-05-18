@@ -188,7 +188,7 @@ class CodeCache : AllStatic {
   static void print_internals();
   static void print_memory_overhead();
   static void verify();                          // verifies the code cache
-  static void print_trace(const char* event, CodeBlob* cb, int size = 0);
+  static void print_trace(const char* event, CodeBlob* cb, int cb_type = CodeBlobType::NumTypes, int size = 0);
   static void print_summary(outputStream* st, bool detailed = true); // Prints a summary of the code cache usage
   static void log_state(outputStream* st);
   LINUX_ONLY(static void write_perf_map();)
