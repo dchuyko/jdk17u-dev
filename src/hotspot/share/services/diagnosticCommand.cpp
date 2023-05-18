@@ -118,6 +118,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderHierarchyDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeListDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ExtraHotDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeCacheDCmd>(full_export, true, false));
 #ifdef LINUX
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<PerfMapDCmd>(full_export, true, false));
@@ -841,6 +842,16 @@ void CodeListDCmd::execute(DCmdSource source, TRAPS) {
   else {
     CodeCache::print_codelist(output());
   }
+}
+
+ExtraHotDCmd::ExtraHotDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _reset_counters("-r", "Print and reset invocation counters.", "BOOLEAN", false, "false") {
+  _dcmdparser.add_dcmd_option(&_reset_counters);
+}
+
+void ExtraHotDCmd::execute(DCmdSource source, TRAPS) {
+  CodeCache::print_extrahot(output(), _reset_counters.value());
 }
 
 void CodeCacheDCmd::execute(DCmdSource source, TRAPS) {

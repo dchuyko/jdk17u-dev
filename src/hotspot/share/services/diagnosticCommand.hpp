@@ -624,6 +624,29 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
+class ExtraHotDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _reset_counters; // true if we whant to reset counters after printing
+public:
+  ExtraHotDCmd(outputStream* output, bool heap);
+  static const char* name() {
+    return "Compiler.extrahot";
+  }
+  static const char* description() {
+    return "Print all compiled extrahot methods in code cache that are alive";
+  }
+  static const char* impact() {
+    return "Medium";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission",
+                        "monitor", nullptr};
+    return p;
+    return p;
+  }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
 class CodeCacheDCmd : public DCmd {
 public:
   CodeCacheDCmd(outputStream* output, bool heap) : DCmd(output, heap) {}

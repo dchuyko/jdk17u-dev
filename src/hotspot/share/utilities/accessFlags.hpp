@@ -60,7 +60,7 @@ enum {
   JVM_ACC_ON_STACK                = 0x00080000,     // RedefineClasses() was used on the stack
   JVM_ACC_RESERVED_DONT_USE1      = 0x00001000,     //
   JVM_ACC_COUNT_CALLS_CANDIDATE   = 0x00002000,     // Method counts compiled calls on entry
-  JVM_ACC_RESERVED_CAN_USE4       = 0x00004000,     //
+  JVM_ACC_EXTRA_HOT_CANDIDATE     = 0x00004000,     // EHT: Two stage flag assignment for debugging
   JVM_ACC_IS_DELETED              = 0x00008000,     // RedefineClasses() has deleted this method
 
   // Klass* flags
@@ -80,6 +80,8 @@ enum {
   JVM_ACC_PROMOTED_FLAGS          = 0x00200000,     // flags promoted from methods to the holding klass
 
   JVM_ACC_COUNT_CALLS            = JVM_ACC_COUNT_CALLS_CANDIDATE,
+  JVM_ACC_EXTRA_HOT              = JVM_ACC_EXTRA_HOT_CANDIDATE,
+
   // field flags
   // Note: these flags must be defined in the low order 16 bits because
   // InstanceKlass only stores a ushort worth of information from the
@@ -138,6 +140,7 @@ class AccessFlags {
   bool has_loops               () const { return (_flags & JVM_ACC_HAS_LOOPS              ) != 0; }
   bool loops_flag_init         () const { return (_flags & JVM_ACC_LOOPS_FLAG_INIT        ) != 0; }
   bool queued_for_compilation  () const { return (_flags & JVM_ACC_QUEUED                 ) != 0; }
+  bool is_extra_hot            () const { return (_flags & JVM_ACC_EXTRA_HOT              ) != 0; }
   bool is_not_c1_compilable    () const { return (_flags & JVM_ACC_NOT_C1_COMPILABLE      ) != 0; }
   bool is_not_c2_compilable    () const { return (_flags & JVM_ACC_NOT_C2_COMPILABLE      ) != 0; }
   bool is_not_c2_osr_compilable() const { return (_flags & JVM_ACC_NOT_C2_OSR_COMPILABLE  ) != 0; }
@@ -216,6 +219,7 @@ class AccessFlags {
   void set_has_monitor_bytecodes()     { atomic_set_bits(JVM_ACC_HAS_MONITOR_BYTECODES);   }
   void set_has_loops()                 { atomic_set_bits(JVM_ACC_HAS_LOOPS);               }
   void set_loops_flag_init()           { atomic_set_bits(JVM_ACC_LOOPS_FLAG_INIT);         }
+  void set_extra_hot()                 { atomic_set_bits(JVM_ACC_EXTRA_HOT);       }
   void set_not_c1_compilable()         { atomic_set_bits(JVM_ACC_NOT_C1_COMPILABLE);       }
   void set_not_c2_compilable()         { atomic_set_bits(JVM_ACC_NOT_C2_COMPILABLE);       }
   void set_not_c2_osr_compilable()     { atomic_set_bits(JVM_ACC_NOT_C2_OSR_COMPILABLE);   }
@@ -230,6 +234,8 @@ class AccessFlags {
   void clear_not_c1_compilable()       { atomic_clear_bits(JVM_ACC_NOT_C1_COMPILABLE);       }
   void clear_not_c2_compilable()       { atomic_clear_bits(JVM_ACC_NOT_C2_COMPILABLE);       }
   void clear_not_c2_osr_compilable()   { atomic_clear_bits(JVM_ACC_NOT_C2_OSR_COMPILABLE);   }
+  void clear_extra_hot()               { atomic_clear_bits(JVM_ACC_EXTRA_HOT);               } // EHT
+
   // Klass* flags
   void set_has_vanilla_constructor()   { atomic_set_bits(JVM_ACC_HAS_VANILLA_CONSTRUCTOR); }
   void set_has_finalizer()             { atomic_set_bits(JVM_ACC_HAS_FINALIZER);           }

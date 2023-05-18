@@ -87,6 +87,7 @@ class methodHandle;
   option(IncrementalInlineForceCleanup, "IncrementalInlineForceCleanup", Bool) \
   option(MaxNodeLimit, "MaxNodeLimit", Intx)  \
   option(CountCalls, "CountCalls", Bool) \
+  option(ExtraHot, "ExtraHot", Bool) \
 NOT_PRODUCT(option(TestOptionInt,    "TestOptionInt",    Intx)) \
 NOT_PRODUCT(option(TestOptionUint,   "TestOptionUint",   Uintx)) \
 NOT_PRODUCT(option(TestOptionBool,   "TestOptionBool",   Bool)) \

@@ -1422,6 +1422,9 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
   }
 
   mark_method_count_calls(method, comp_level, hot_count, directive);
+  // EHT:
+  mark_method_extra_hot(method, comp_level, hot_count, directive);
+
 #if INCLUDE_JVMCI
   if (comp->is_jvmci() && !JVMCI::can_initialize_JVMCI()) {
     return NULL;
@@ -1544,6 +1547,36 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
   return method->lookup_osr_nmethod_for(osr_bci, comp_level, false);
 }
 
+
+// EHT: Set extra_hot_flag for methods marked int CompileOracle with
+// option * ExtraHot
+void CompileBroker::mark_method_extra_hot(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+  if (!ExtraHotCodeCache ||
+      comp_level != CompLevel_full_optimization || method->is_native()) {
+    return;
+  }
+
+  bool extra_hot = false;
+  bool extra_hot_dir = directive->ExtraHotOption;
+
+  if (!extra_hot_dir) {
+    extra_hot = (CompilerOracle::has_option_value(method, CompileCommand::ExtraHot, extra_hot) && extra_hot);
+  }
+
+  if (extra_hot || extra_hot_dir) {
+    method->set_extra_hot();
+
+    // Print compilation
+    bool quietly = CompilerOracle::be_quiet();
+    if (PrintCompilation && !quietly) {
+      // This does not happen quietly...
+      ResourceMark rm;
+      tty->print("### ExtraHot %s ", (method->is_static() ? " static" : ""));
+      method->print_short_name(tty);
+      tty->print_cr(" (%s) hot_count %d", (extra_hot_dir) ? "directive" : "command",  hot_count);
+    }
+  }
+}
 
 // ------------------------------------------------------------------
 // CompileBroker::compilation_is_complete

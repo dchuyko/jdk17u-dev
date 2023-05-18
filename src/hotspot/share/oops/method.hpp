@@ -368,6 +368,7 @@ class Method : public Metadata {
   // can be updated
   void clear_method_flags() {
     clear_count_calls();
+    clear_extra_hot();
   }
 
   bool init_method_counters(MethodCounters* counters);
@@ -921,6 +922,13 @@ public:
   void set_count_calls()            {       _access_flags.set_count_calls(); }
   bool is_count_calls() const       { return access_flags().is_count_calls();  }
   void clear_count_calls()          {       _access_flags.clear_count_calls(); }
+
+  // EHT
+  void set_extra_hot()              {       _access_flags.set_extra_hot(); }
+  bool is_extra_hot() const         { return access_flags().is_extra_hot();  }
+  void clear_extra_hot()            {       _access_flags.clear_extra_hot(); }
+
+
   bool   is_not_c1_compilable() const         { return access_flags().is_not_c1_compilable();  }
   void  set_not_c1_compilable()               {       _access_flags.set_not_c1_compilable();   }
   void clear_not_c1_compilable()              {       _access_flags.clear_not_c1_compilable(); }
