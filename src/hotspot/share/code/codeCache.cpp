@@ -1191,6 +1191,34 @@ int CodeCache::mark_for_deoptimization(Method* dependee) {
   return number_of_marked_CodeBlobs;
 }
 
+int CodeCache::mark_for_deoptimization_directives_matches() {
+  MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  Thread *thread = Thread::current();
+
+  int marked = 0;
+  CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
+  while(iter.next()) {
+    CompiledMethod* nm = iter.method();
+    if (!nm->is_native_method()) {
+      HandleMark hm(thread);
+      methodHandle mh(thread, nm->method());
+      if (DirectivesStack::hasMatchingDirectives(mh)) {
+        ResourceMark rm;
+        log_trace(codecache)("Mark for deopt because of matching directives %s", mh->external_name());
+        ++ marked;
+        nm->mark_for_deoptimization();
+      }
+    }
+  }
+  return marked;
+}
+
+void CodeCache::make_marked_nmethods_deoptimized(int marked) {
+  if (marked > 0) {
+    Deoptimization::deoptimize_all_marked();
+  }
+}
+
 void CodeCache::make_marked_nmethods_not_entrant() {
   assert_locked_or_safepoint(CodeCache_lock);
   CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
