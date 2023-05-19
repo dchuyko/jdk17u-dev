@@ -1672,9 +1672,10 @@ void CodeCache::print_codelist_with_counters(outputStream* st, bool reset_counte
     CompiledMethod* cm = iter.method();
     ResourceMark rm;
     char* method_name = cm->method()->name_and_sig_as_C_string();
-    st->print("%d %d %d %6d %8ld ",
+    st->print("%d %d %d %6d %lld ",
                cm->compile_id(), cm->comp_level(), cm->get_state(),
-               cm->method()->interpreter_invocation_count(), cm->method()->compiled_invocation_count());
+               cm->method()->interpreter_invocation_count(),
+               (long long)cm->method()->compiled_invocation_count());
     st->print_cr("%s [" INTPTR_FORMAT ", " INTPTR_FORMAT " - " INTPTR_FORMAT "]",
                  method_name,
                  (intptr_t)cm->header_begin(), (intptr_t)cm->code_begin(), (intptr_t)cm->code_end());
@@ -1697,9 +1698,10 @@ void CodeCache::print_extrahot(outputStream* st, bool reset_counters) {
       CodeBlob *cb = cm->as_codeblob_or_null();
       const char *heap_name = (cb != nullptr) ? get_code_heap(cb)->name() : "unknown";
       char* method_name = cm->method()->name_and_sig_as_C_string();
-      st->print("%d %d %d %6d %8ld ",
+      st->print("%d %d %d %6d %lld ",
                 cm->compile_id(), cm->comp_level(), cm->get_state(),
-                cm->method()->interpreter_invocation_count(), cm->method()->compiled_invocation_count());
+                cm->method()->interpreter_invocation_count(),
+                (long long)cm->method()->compiled_invocation_count());
       st->print_cr("%s [" INTPTR_FORMAT ", " INTPTR_FORMAT " - " INTPTR_FORMAT "] %s",
                   method_name,
                   (intptr_t)cm->header_begin(), (intptr_t)cm->code_begin(), (intptr_t)cm->code_end(), heap_name);
