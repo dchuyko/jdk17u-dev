@@ -1551,6 +1551,7 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
 // EHT: Set extra_hot_flag for methods marked int CompileOracle with
 // option * ExtraHot
 void CompileBroker::mark_method_extra_hot(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+#ifdef COMPILER2
   if (!ExtraHotCodeCache ||
       comp_level != CompLevel_full_optimization || method->is_native()) {
     return;
@@ -1576,6 +1577,7 @@ void CompileBroker::mark_method_extra_hot(const methodHandle& method, int comp_l
       tty->print_cr(" (%s) hot_count %d", (extra_hot_dir) ? "directive" : "command",  hot_count);
     }
   }
+#endif
 }
 
 // ------------------------------------------------------------------
@@ -1621,6 +1623,7 @@ bool CompileBroker::compilation_is_in_queue(const methodHandle& method) {
 
 // Set count_calls flag for methods with option CountCalls
 void CompileBroker::mark_method_count_calls(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+#ifdef COMPILER2
   (void) hot_count;
 
   if (comp_level != CompLevel_full_optimization || method->is_native()) {
@@ -1639,7 +1642,10 @@ void CompileBroker::mark_method_count_calls(const methodHandle& method, int comp
     method->set_compiled_invocation_count(0);
     method->set_count_calls();
   }
-}// ------------------------------------------------------------------
+#endif
+}
+
+// ------------------------------------------------------------------
 // CompileBroker::compilation_is_prohibited
 //
 // See if this compilation is not allowed.
