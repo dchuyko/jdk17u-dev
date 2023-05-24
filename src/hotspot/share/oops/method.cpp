@@ -118,7 +118,7 @@ Method::Method(ConstMethod* xconst, AccessFlags access_flags) {
     set_signature_handler(NULL);
   }
 
-  NOT_PRODUCT(set_compiled_invocation_count(0);)
+  set_compiled_invocation_count(0);
 }
 
 // Release Method*.  The nmethod will be gone when we get here because
@@ -561,11 +561,9 @@ void Method::print_invocation_count() {
     tty->print_cr ("  decompile_count:              " UINT32_FORMAT_W(11), method_data()->decompile_count());
   }
 
-#ifndef PRODUCT
   if (CountCompiledCalls) {
     tty->print_cr ("  compiled_invocation_count:    " INT64_FORMAT_W(11), compiled_invocation_count());
   }
-#endif
 }
 
 // Build a MethodData* object to hold information about this method
@@ -1174,7 +1172,7 @@ void Method::unlink_method() {
     *native_function_addr() = NULL;
     set_signature_handler(NULL);
   }
-  NOT_PRODUCT(set_compiled_invocation_count(0);)
+  set_compiled_invocation_count(0);
 
   set_method_data(NULL);
   clear_method_counters();

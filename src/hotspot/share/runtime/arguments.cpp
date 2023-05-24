@@ -3922,6 +3922,12 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
       UseCounterDecay = false;
     }
   }
+#else
+  if (CountCompiledCalls) {
+    //EHT: UseCounterDecay flag seems to be unused,
+    // but set it anyway. For product do it silently.
+    UseCounterDecay = false;
+  }
 #endif // PRODUCT
 
   if (ScavengeRootsInCode == 0) {
@@ -4120,6 +4126,14 @@ jint Arguments::apply_ergo() {
       LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(valuebasedclasses));
     }
   }
+
+  if (!ExtraHotCodeCache) { // EHT
+    if (FLAG_IS_CMDLINE(ExtraHotCodeHeapSize)) {
+      warning("ExtraHoteCodeCache is not enabled. Ignoring value of ExtraHotCodeHeapSize.");
+    }
+    FLAG_SET_DEFAULT(ExtraHotCodeHeapSize, 0);
+  }
+
   return JNI_OK;
 }
 
