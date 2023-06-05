@@ -39,6 +39,7 @@
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/typeArrayOop.inline.hpp"
+#include "runtime/deoptimization.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/flags/jvmFlag.hpp"
 #include "runtime/handles.inline.hpp"
@@ -117,6 +118,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderHierarchyDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeListDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ExtraHotDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeCacheDCmd>(full_export, true, false));
 #ifdef LINUX
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<PerfMapDCmd>(full_export, true, false));
@@ -127,6 +129,7 @@ void DCmdRegistrant::register_dcmds(){
 
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesPrintDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesAddDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesReplaceDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesRemoveDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesClearDCmd>(full_export, true, false));
 
@@ -823,8 +826,32 @@ void CompileQueueDCmd::execute(DCmdSource source, TRAPS) {
   VMThread::execute(&printCompileQueueOp);
 }
 
+CodeListDCmd::CodeListDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _show_counters("-c", "Print invocation counters.", "BOOLEAN", false, "false"),
+  _reset_counters("-r", "Print and reset invocation counters.", "BOOLEAN", false, "false") {
+
+  _dcmdparser.add_dcmd_option(&_show_counters);
+  _dcmdparser.add_dcmd_option(&_reset_counters);
+}
+
 void CodeListDCmd::execute(DCmdSource source, TRAPS) {
-  CodeCache::print_codelist(output());
+  if (_show_counters.value() || _reset_counters.value()) {
+    CodeCache::print_codelist_with_counters(output(), _reset_counters.value());
+  }
+  else {
+    CodeCache::print_codelist(output());
+  }
+}
+
+ExtraHotDCmd::ExtraHotDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _reset_counters("-r", "Print and reset invocation counters.", "BOOLEAN", false, "false") {
+  _dcmdparser.add_dcmd_option(&_reset_counters);
+}
+
+void ExtraHotDCmd::execute(DCmdSource source, TRAPS) {
+  CodeCache::print_extrahot(output(), _reset_counters.value());
 }
 
 void CodeCacheDCmd::execute(DCmdSource source, TRAPS) {
@@ -892,21 +919,83 @@ void CompilerDirectivesPrintDCmd::execute(DCmdSource source, TRAPS) {
 
 CompilerDirectivesAddDCmd::CompilerDirectivesAddDCmd(outputStream* output, bool heap) :
                            DCmdWithParser(output, heap),
-  _filename("filename","Name of the directives file", "STRING",true) {
+  _filename("filename","Name of the directives file", "STRING",true),
+  _force_deopt("-d", "Force deoptimization of affected methods.", "BOOLEAN", false, "false") {
+
   _dcmdparser.add_dcmd_argument(&_filename);
+  _dcmdparser.add_dcmd_option(&_force_deopt);
 }
 
 void CompilerDirectivesAddDCmd::execute(DCmdSource source, TRAPS) {
   DirectivesParser::parse_from_file(_filename.value(), output());
+  if (_force_deopt.value()) {
+    int marked = CodeCache::mark_for_deoptimization_directives_matches();
+    CodeCache::make_marked_nmethods_deoptimized(marked);
+  }
+}
+
+CompilerDirectivesReplaceDCmd::CompilerDirectivesReplaceDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _filename("filename","Name of the directives file", "STRING",true),
+  _force_deopt("-d", "Force deoptimization of affected methods.", "BOOLEAN", false, "false") {
+
+  _dcmdparser.add_dcmd_argument(&_filename);
+  _dcmdparser.add_dcmd_option(&_force_deopt);
+}
+
+void CompilerDirectivesReplaceDCmd::execute(DCmdSource source, TRAPS) {
+  // Need to duplicate some code, to be compliant with later versions of jdk.
+  if (_force_deopt.value()) {
+    int marked = CodeCache::mark_for_deoptimization_directives_matches();
+    DirectivesStack::clear();
+    DirectivesParser::parse_from_file(_filename.value(), output());
+    marked += CodeCache::mark_for_deoptimization_directives_matches();
+    CodeCache::make_marked_nmethods_deoptimized(marked);
+  }
+  else {
+    DirectivesStack::clear();
+    DirectivesParser::parse_from_file(_filename.value(), output());
+  }
+}
+
+CompilerDirectivesRemoveDCmd::CompilerDirectivesRemoveDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _force_deopt("-d", "Force deoptimization of affected methods.", "BOOLEAN", false, "false") {
+
+  _dcmdparser.add_dcmd_option(&_force_deopt);
 }
 
 void CompilerDirectivesRemoveDCmd::execute(DCmdSource source, TRAPS) {
-  DirectivesStack::pop(1);
+  // Need to duplicate some code, to be compliant with later versions of jdk.
+  if (_force_deopt.value()) {
+    int marked = CodeCache::mark_for_deoptimization_directives_matches();
+    DirectivesStack::pop(1);
+    CodeCache::make_marked_nmethods_deoptimized(marked);
+  }
+  else {
+    DirectivesStack::pop(1);
+  }
+}
+
+CompilerDirectivesClearDCmd::CompilerDirectivesClearDCmd(outputStream* output, bool heap) :
+                           DCmdWithParser(output, heap),
+  _force_deopt("-d", "Force deoptimization of affected methods.", "BOOLEAN", false, "false") {
+
+  _dcmdparser.add_dcmd_option(&_force_deopt);
 }
 
 void CompilerDirectivesClearDCmd::execute(DCmdSource source, TRAPS) {
-  DirectivesStack::clear();
+  // Need to duplicate some code, to be compliant with later versions of jdk.
+  if (_force_deopt.value()) {
+    int marked = CodeCache::mark_for_deoptimization_directives_matches();
+    DirectivesStack::clear();
+    CodeCache::make_marked_nmethods_deoptimized(marked);
+  }
+  else {
+    DirectivesStack::clear();
+  }
 }
+
 #if INCLUDE_SERVICES
 ClassHierarchyDCmd::ClassHierarchyDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
