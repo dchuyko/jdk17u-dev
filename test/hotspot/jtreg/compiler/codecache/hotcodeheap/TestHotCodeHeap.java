@@ -23,6 +23,7 @@
 
 /*
  * @test TestHotCodeHeap
+ * @library /test/lib
  * @run testng/othervm TestHotCodeHeap
  * @requires vm.flavor == "server"
  * @summary Test of Hot CodeCache segment
@@ -142,19 +143,15 @@ public class TestHotCodeHeap {
         return file.getAbsolutePath();
     }
 
-    public CodeHeap runVM(String... vmOption) {
+    CodeHeap runVM(CodeCacheConfiguration config) {
+        return runVM(config.toJVMOptions());
+    }
+
+    CodeHeap runVM(ArrayList<String> commands) {
 
         CodeHeap codeHeap = new CodeHeap();
-
-        ArrayList<String> command = new ArrayList<String>();
-        command.add("-Xbootclasspath/a:.");
-        command.add("-XX:+UnlockDiagnosticVMOptions");
-        command.add("-Xcomp");
-        command.add("-Xbatch");
-        command.add("-XX:+ExtraHotCodeCache");
-        command.addAll(java.util.Arrays.asList(vmOption));
-        command.add("TestHotCodeHeap");
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(command);
+        commands.add("TestHotCodeHeap");
+        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(commands);
         try {
             OutputAnalyzer output = new OutputAnalyzer(pb.start());
             Iterator<String> lines = output.asLines().iterator();
@@ -228,37 +225,77 @@ public class TestHotCodeHeap {
         });
     }
 
+    class CodeCacheConfiguration {
+        ArrayList<String> options = new ArrayList<String>();
+        CodeCacheConfiguration() {
+            options.add("-Xbootclasspath/a:.");
+            options.add("-XX:+UnlockDiagnosticVMOptions");
+            options.add("-Xcomp");
+            options.add("-Xbatch");
+            options.add("-XX:+ExtraHotCodeCache");
+        }
+        ArrayList<String> toJVMOptions() {
+            return options;
+        }
+        CodeCacheConfiguration setCompileCommand(String commands) {
+            String cmdFile = prepareCmdFile(commands);
+            options.add("-XX:CompileCommandFile=" + cmdFile);
+            return this;
+        }
+        CodeCacheConfiguration setCompilerDirectives(String commands) {
+            String cmdFile = prepareCmdFile(commands);
+            options.add("-XX:CompilerDirectivesFile=" + cmdFile);
+            return this;
+        }
+        CodeCacheConfiguration setSegmented(boolean segmentedOn) {
+            options.add("-XX:" + (segmentedOn ? "+" : "-") + "SegmentedCodeCache");
+            return this;
+        }
+        CodeCacheConfiguration setTiered(boolean tieredOn) {
+            options.add("-XX:" + (tieredOn ? "+" : "-") + "TieredCompilation");
+            return this;
+        }
+        CodeCacheConfiguration addOption(String option) {
+            options.add(option);
+            return this;
+        }
+    }
+
     @Test
     public void testCommandFile() {
-        String cmdFile = prepareCmdFile("option java*::* ExtraHot");
-        CodeHeap codeHeap = runVM("-XX:+SegmentedCodeCache", "-XX:CompileCommandFile=" + cmdFile);
+        CodeCacheConfiguration config = new CodeCacheConfiguration().setSegmented(true).setCompileCommand("option java*::* ExtraHot");
+        CodeHeap codeHeap = runVM(config);
         checkJavaMethodsBelongsToHotSegmentOnly(codeHeap);
     }
 
     @Test
     public void testDirectivesFile() {
-        String dirctFile = prepareCmdFile("[ { match: [ \"java*::*\" ], c2: { ExtraHot: true } } ]");
-        CodeHeap codeHeap = runVM("-XX:+SegmentedCodeCache", "-XX:CompilerDirectivesFile=" + dirctFile);
+        CodeCacheConfiguration config = new CodeCacheConfiguration().setSegmented(true).
+            setCompilerDirectives("[ { match: [ \"java*::*\" ], c2: { ExtraHot: true } } ]");
+        CodeHeap codeHeap = runVM(config);
         checkJavaMethodsBelongsToHotSegmentOnly(codeHeap);
     }
 
     @Test
     public void testSegmentedNonTiered() {
-        String dirctFile = prepareCmdFile("[ { match: [ \"java*::*\" ], c2: { ExtraHot: true } } ]");
-        CodeHeap codeHeap = runVM("-XX:CompilerDirectivesFile=" + dirctFile, "-XX:+SegmentedCodeCache", "-XX:-TieredCompilation");
+        CodeCacheConfiguration config = new CodeCacheConfiguration().setSegmented(true).setTiered(false).
+            setCompilerDirectives("[ { match: [ \"java*::*\" ], c2: { ExtraHot: true } } ]");
+        CodeHeap codeHeap = runVM(config);
         checkJavaMethodsBelongsToHotSegmentOnly(codeHeap);
     }
 
     @Test
     public void testNonsegmented() {
-        String dirctFile = prepareCmdFile("[ { match: [ \"java*::*\" ], c2: { ExtraHot: true } } ]");
-        CodeHeap codeHeap = runVM("-XX:CompilerDirectivesFile=" + dirctFile, "-XX:-SegmentedCodeCache");
+        CodeCacheConfiguration config = new CodeCacheConfiguration().setSegmented(false).
+            setCompilerDirectives("[ { match: [ \"java*::*\" ], c2: { ExtraHot: true } } ]");
+        CodeHeap codeHeap = runVM(config);
         checkJavaMethodsBelongsToHotSegmentOnly(codeHeap);
     }
 
     @Test
     public void testEmptyHotSegment() {
-        CodeHeap codeHeap = runVM("-XX:ExtraHotCodeHeapSize=10K");
+        CodeCacheConfiguration config = new CodeCacheConfiguration().addOption("-XX:ExtraHotCodeHeapSize=10K");
+        CodeHeap codeHeap = runVM(config);
         if (!codeHeap.hotSegmentMethods.isEmpty()) {
             reportError("hot segment must be empty!");
         }
@@ -266,8 +303,11 @@ public class TestHotCodeHeap {
 
     @Test
     public void testSmallHotSegment() {
-        String cmdFile = prepareCmdFile("option java*::* ExtraHot");
-        CodeHeap codeHeap = runVM("-XX:+SegmentedCodeCache", "-XX:CompileCommandFile=" + cmdFile, "-XX:ExtraHotCodeHeapSize=10K");
+        CodeCacheConfiguration config = new CodeCacheConfiguration().setSegmented(true).
+            setCompileCommand("option java*::* ExtraHot").
+            addOption("-XX:ExtraHotCodeHeapSize=100K");
+        CodeHeap codeHeap = runVM(config);
+
         if (codeHeap.hotSegmentMethods.isEmpty()) {
             reportError("hot segment should not be empty");
         }
