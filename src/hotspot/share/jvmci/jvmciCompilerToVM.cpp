@@ -1083,7 +1083,7 @@ C2V_VMENTRY(void, reprofile, (JNIEnv* env, jobject, jobject jvmci_method))
   if (mcs != NULL) {
     mcs->clear_counters();
   }
-  NOT_PRODUCT(method->set_compiled_invocation_count(0));
+  method->set_compiled_invocation_count(0);
 
   CompiledMethod* code = method->code();
   if (code != NULL) {

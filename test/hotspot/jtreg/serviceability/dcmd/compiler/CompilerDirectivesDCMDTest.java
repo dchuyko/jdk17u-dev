@@ -28,7 +28,7 @@
  * @modules java.base/jdk.internal.misc
  *          java.compiler
  *          java.management
- * @run testng/othervm CompilerDirectivesDCMDTest
+ * @run testng/othervm -XX:+CountCompiledCalls CompilerDirectivesDCMDTest
  * @summary Test of diagnostic command
  */
 
@@ -42,6 +42,9 @@ import org.testng.Assert;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 public class CompilerDirectivesDCMDTest {
 
@@ -55,7 +58,17 @@ public class CompilerDirectivesDCMDTest {
             filename = System.getProperty("test.src", ".") + File.separator + "control1.txt";
         }
         testPrintCommand(executor);
-        testAddAndRemoveCommand(executor);
+        testAddAndRemoveCommand(executor, false /*don't force deopt*/);
+        testAddAndRemoveCommand(executor, true /*force deopt*/);
+
+        filename = System.getProperty("test.src", ".") + File.separator + "control3.txt";
+        testForcedDeopt(executor);
+
+        if (Platform.isServer() && !Platform.isEmulatedClient()) {
+          // Compiled calls counter available for c2 only
+          filename = System.getProperty("test.src", ".") + File.separator + "control4.txt";
+          testCountCompiledCalls(executor);
+        }
     }
 
     public static void testPrintCommand(CommandExecutor executor) {
@@ -68,12 +81,62 @@ public class CompilerDirectivesDCMDTest {
         }
     }
 
-    public static void testAddAndRemoveCommand(CommandExecutor executor) {
+    public static void testForcedDeopt(CommandExecutor executor) {
+        OutputAnalyzer output;
+
+        // j.l.S.equals is already compiled, so in the output of the Compiler.codelist
+        // command we see the method in state 0 (in use). After forced de-optimisation,
+        // the method will be shown in state 2 (marked for de-optimisation) or
+        // doesn't appear in the output at all.
+
+        output = executor.execute("Compiler.directives_replace " + filename + " -d");
+        output = executor.execute("Compiler.codelist");
+        ArrayList<String> selected = findPattern(output, ".*java.lang.String.equals\\(.*");
+        if (selected.size() == 0) {
+            Assert.fail("No j.l.s.equals in the output, something got wrong");
+        }
+
+        for (String line : selected) {
+          String fields[] = line.split("\\s+");
+          int level = Integer.valueOf(fields[1]); // get compilation level, should not be 4 (c2)
+          int state = Integer.valueOf(fields[2]); // get nmethod state, should not be 0 see: compiledMethod.hpp
+          if (level == 4 && state == 0) {
+            System.err.println(line);
+            Assert.fail("Expected no c2 compiled instances of j.l.S.equals");
+          }
+        }
+    }
+
+    public static void testCountCompiledCalls(CommandExecutor executor) {
+        OutputAnalyzer output;
+        executor.execute("Compiler.directives_add " + filename + " -d");
+        output = executor.execute("Compiler.codelist -c");
+        ArrayList<String> selected = findPattern(output, ".*java.lang.String.startsWith\\(.*");
+        int compiled_methods = 0;
+        for (String line : selected) {
+            String fields[] = line.split("\\s+");
+            int level = Integer.valueOf(fields[1]); // get compilation level, should not be 4 (c2)
+            long invocations = Long.valueOf(fields[4]);
+            if (level == 4) {
+                compiled_methods += 1;
+                if (invocations == 0) {
+                    System.err.println(line);
+                    Assert.fail("Expected non zero compiled inocation count for j.l.s.startsWith");
+                }
+            }
+        }
+        if (compiled_methods == 0) {
+            Assert.fail("Compiled calls count for j.l.s.startsWith should not be zero");
+        }
+     }
+
+    public static void testAddAndRemoveCommand(CommandExecutor executor, boolean force_deopt) {
         OutputAnalyzer output;
         int count = 0;
+        String fdeo = (force_deopt) ? " -d" : "";
 
         // Start with clearing stack - expect only default directive left
-        output = executor.execute("Compiler.directives_clear");
+        output = executor.execute("Compiler.directives_clear" + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 1) {
@@ -81,15 +144,23 @@ public class CompilerDirectivesDCMDTest {
         }
 
         // Test that we can not remove the default directive
-        output = executor.execute("Compiler.directives_remove");
+        output = executor.execute("Compiler.directives_remove" + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 1) {
             Assert.fail("Expected one directives - found " + count);
         }
 
-        // Test adding some directives from file
-        output = executor.execute("Compiler.directives_add " + filename);
+       // Test adding some directives from file
+        output = executor.execute("Compiler.directives_add " + filename + fdeo);
+        output = executor.execute("Compiler.directives_print");
+        count = find(output, "Directive:");
+        if (count != 3) {
+            Assert.fail("Expected three directives - found " + count);
+        }
+
+       // Test replace directives from file
+        output = executor.execute("Compiler.directives_replace " + filename + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 3) {
@@ -97,7 +168,7 @@ public class CompilerDirectivesDCMDTest {
         }
 
         // Test remove one directive
-        output = executor.execute("Compiler.directives_remove");
+        output = executor.execute("Compiler.directives_remove" + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 2) {
@@ -105,7 +176,7 @@ public class CompilerDirectivesDCMDTest {
         }
 
         // Test adding directives again
-        output = executor.execute("Compiler.directives_add " + filename);
+        output = executor.execute("Compiler.directives_add " + filename + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 4) {
@@ -113,7 +184,7 @@ public class CompilerDirectivesDCMDTest {
         }
 
         // Test clearing
-        output = executor.execute("Compiler.directives_clear");
+        output = executor.execute("Compiler.directives_clear" + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 1) {
@@ -121,7 +192,7 @@ public class CompilerDirectivesDCMDTest {
         }
 
         // Test clear when already cleared
-        output = executor.execute("Compiler.directives_clear");
+        output = executor.execute("Compiler.directives_clear" + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 1) {
@@ -129,7 +200,7 @@ public class CompilerDirectivesDCMDTest {
         }
 
         // Test remove one directive when empty
-        output = executor.execute("Compiler.directives_remove");
+        output = executor.execute("Compiler.directives_remove" + fdeo);
         output = executor.execute("Compiler.directives_print");
         count = find(output, "Directive:");
         if (count != 1) {
@@ -147,6 +218,21 @@ public class CompilerDirectivesDCMDTest {
         }
         return count;
     }
+
+    public static ArrayList<String> findPattern(OutputAnalyzer output, String regexp) {
+        int count = 0;
+        Pattern pattern = Pattern.compile(regexp);
+        ArrayList<String> res = new ArrayList<String>();
+
+        for (String line : output.asLines()) {
+            Matcher matcher = pattern.matcher(line);
+            if (matcher.matches()) {
+                res.add(line);
+            }
+        }
+        return res;
+    }
+
 
     @Test
     public void jmx() {

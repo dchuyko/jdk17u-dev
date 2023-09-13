@@ -96,9 +96,8 @@ class Method : public Metadata {
 
   JFR_ONLY(DEFINE_TRACE_FLAG;)
 
-#ifndef PRODUCT
   int64_t _compiled_invocation_count;
-#endif
+
   // Entry point for calling both from and to the interpreter.
   address _i2i_entry;           // All-args-on-stack calling convention
   // Entry point for calling from compiled code, to compiled code if it exists
@@ -364,6 +363,14 @@ class Method : public Metadata {
     _method_counters = NULL;
   }
 
+  // Clear the flags related to compiler derectives that
+  // was set by compilerBroker, because derectives
+  // can be updated
+  void clear_method_flags() {
+    clear_count_calls();
+    clear_extra_hot();
+  }
+
   bool init_method_counters(MethodCounters* counters);
 
   int prev_event_count() const {
@@ -417,13 +424,8 @@ class Method : public Metadata {
 
   int interpreter_invocation_count()            { return invocation_count();          }
 
-#ifndef PRODUCT
   int64_t  compiled_invocation_count() const    { return _compiled_invocation_count;}
   void set_compiled_invocation_count(int count) { _compiled_invocation_count = (int64_t)count; }
-#else
-  // for PrintMethodData in a product build
-  int64_t  compiled_invocation_count() const    { return 0; }
-#endif // not PRODUCT
 
   // Clear (non-shared space) pointers which could not be relevant
   // if this (shared) method were mapped into another JVM.
@@ -677,9 +679,9 @@ public:
   static ByteSize method_counters_offset()       {
     return byte_offset_of(Method, _method_counters);
   }
-#ifndef PRODUCT
+
   static ByteSize compiled_invocation_counter_offset() { return byte_offset_of(Method, _compiled_invocation_count); }
-#endif // not PRODUCT
+
   static ByteSize native_function_offset()       { return in_ByteSize(sizeof(Method));                 }
   static ByteSize from_interpreted_offset()      { return byte_offset_of(Method, _from_interpreted_entry ); }
   static ByteSize interpreter_entry_offset()     { return byte_offset_of(Method, _i2i_entry ); }
@@ -916,6 +918,16 @@ public:
     }
     return _method_counters;
   }
+
+  void set_count_calls()            {       _access_flags.set_count_calls(); }
+  bool is_count_calls() const       { return access_flags().is_count_calls();  }
+  void clear_count_calls()          {       _access_flags.clear_count_calls(); }
+
+  // EHT
+  void set_extra_hot()              {       _access_flags.set_extra_hot(); }
+  bool is_extra_hot() const         { return access_flags().is_extra_hot();  }
+  void clear_extra_hot()            {       _access_flags.clear_extra_hot(); }
+
 
   bool   is_not_c1_compilable() const         { return access_flags().is_not_c1_compilable();  }
   void  set_not_c1_compilable()               {       _access_flags.set_not_c1_compilable();   }

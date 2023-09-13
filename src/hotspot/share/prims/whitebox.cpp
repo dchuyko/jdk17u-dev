@@ -1139,7 +1139,7 @@ WB_ENTRY(void, WB_ClearMethodState(JNIEnv* env, jobject o, jobject method))
   mh->clear_not_c1_compilable();
   mh->clear_not_c2_compilable();
   mh->clear_not_c2_osr_compilable();
-  NOT_PRODUCT(mh->set_compiled_invocation_count(0));
+  mh->set_compiled_invocation_count(0);
   if (mcs != NULL) {
     mcs->clear_counters();
   }

@@ -601,9 +601,12 @@ public:
 };
 #endif // LINUX
 
-class CodeListDCmd : public DCmd {
+class CodeListDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _show_counters; // true if we whant to print counters
+  DCmdArgument<bool> _reset_counters; // true if we whant to reset counters after printing
 public:
-  CodeListDCmd(outputStream* output, bool heap) : DCmd(output, heap) {}
+  CodeListDCmd(outputStream* output, bool heap);
   static const char* name() {
     return "Compiler.codelist";
   }
@@ -616,6 +619,29 @@ public:
   static const JavaPermission permission() {
     JavaPermission p = {"java.lang.management.ManagementPermission",
                         "monitor", NULL};
+    return p;
+  }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
+class ExtraHotDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _reset_counters; // true if we whant to reset counters after printing
+public:
+  ExtraHotDCmd(outputStream* output, bool heap);
+  static const char* name() {
+    return "Compiler.extrahot";
+  }
+  static const char* description() {
+    return "Print all compiled extrahot methods in code cache that are alive";
+  }
+  static const char* impact() {
+    return "Medium";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission",
+                        "monitor", nullptr};
+    return p;
     return p;
   }
   virtual void execute(DCmdSource source, TRAPS);
@@ -687,9 +713,11 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class CompilerDirectivesRemoveDCmd : public DCmd {
+class CompilerDirectivesRemoveDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _force_deopt; // true if deopt should be forced after directives changes.
 public:
-  CompilerDirectivesRemoveDCmd(outputStream* output, bool heap) : DCmd(output, heap) {}
+  CompilerDirectivesRemoveDCmd(outputStream* output, bool heap);
   static const char* name() {
     return "Compiler.directives_remove";
   }
@@ -710,6 +738,7 @@ public:
 class CompilerDirectivesAddDCmd : public DCmdWithParser {
 protected:
   DCmdArgument<char*> _filename;
+  DCmdArgument<bool> _force_deopt; // true if deopt should be forced after directives changes.
 public:
   CompilerDirectivesAddDCmd(outputStream* output, bool heap);
   static const char* name() {
@@ -729,9 +758,34 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class CompilerDirectivesClearDCmd : public DCmd {
+class CompilerDirectivesReplaceDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<char*> _filename;
+  DCmdArgument<bool> _force_deopt; // true if deopt should be forced after directives changes.
 public:
-  CompilerDirectivesClearDCmd(outputStream* output, bool heap) : DCmd(output, heap) {}
+  CompilerDirectivesReplaceDCmd(outputStream* output, bool heap);
+  static const char* name() {
+    return "Compiler.directives_replace";
+  }
+  static const char* description() {
+    return "Clear derectives stack amd load new compiler directives from file.";
+  }
+  static const char* impact() {
+    return "Low";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission",
+                        "monitor", NULL};
+    return p;
+  }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
+class CompilerDirectivesClearDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _force_deopt; // true if deopt should be forced after directives changes.
+public:
+  CompilerDirectivesClearDCmd(outputStream* output, bool heap);
   static const char* name() {
     return "Compiler.directives_clear";
   }

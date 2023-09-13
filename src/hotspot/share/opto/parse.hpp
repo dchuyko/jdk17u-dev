@@ -555,7 +555,7 @@ class Parse : public GraphKit {
   void decrement_age();
 
   // helper function for call statistics
-  void count_compiled_calls(bool at_method_entry, bool is_inline) PRODUCT_RETURN;
+  void count_compiled_calls(bool at_method_entry, bool is_inline);
 
   Node_Notes* make_node_notes(Node_Notes* caller_nn);
 

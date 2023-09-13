@@ -69,6 +69,8 @@ NOT_PRODUCT(cflags(TraceOptoOutput,     bool, TraceOptoOutput, TraceOptoOutput))
 NOT_PRODUCT(cflags(PrintIdeal,          bool, PrintIdeal, PrintIdeal)) \
     cflags(TraceSpilling,           bool, TraceSpilling, TraceSpilling) \
     cflags(Vectorize,               bool, false, Vectorize) \
+    cflags(CountCalls,              bool, false, CountCalls) \
+    cflags(ExtraHot,                bool, false, ExtraHot) \
     cflags(CloneMapDebug,           bool, false, CloneMapDebug) \
 NOT_PRODUCT(cflags(IGVPrintLevel,       intx, PrintIdealGraphLevel, IGVPrintLevel)) \
     cflags(VectorizeDebug,          uintx, 0, VectorizeDebug) \
@@ -92,6 +94,7 @@ private:
 public:
   static void init();
   static DirectiveSet* getMatchingDirective(const methodHandle& mh, AbstractCompiler* comp);
+  static bool hasMatchingDirectives(const methodHandle& method);
   static DirectiveSet* getDefaultDirective(AbstractCompiler* comp);
   static void push(CompilerDirectives* directive);
   static void pop(int count);

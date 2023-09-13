@@ -240,6 +240,8 @@ class CompileBroker: AllStatic {
   static void init_compiler_sweeper_threads();
   static void possibly_add_compiler_threads(JavaThread* THREAD);
   static bool compilation_is_prohibited(const methodHandle& method, int osr_bci, int comp_level, bool excluded);
+  static void mark_method_count_calls(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive);
+  static void mark_method_extra_hot(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive); // EHT
 
   static CompileTask* create_compile_task(CompileQueue*       queue,
                                           int                 compile_id,

@@ -1421,6 +1421,10 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
     return NULL;
   }
 
+  mark_method_count_calls(method, comp_level, hot_count, directive);
+  // EHT:
+  mark_method_extra_hot(method, comp_level, hot_count, directive);
+
 #if INCLUDE_JVMCI
   if (comp->is_jvmci() && !JVMCI::can_initialize_JVMCI()) {
     return NULL;
@@ -1544,6 +1548,38 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
 }
 
 
+// EHT: Set extra_hot_flag for methods marked int CompileOracle with
+// option * ExtraHot
+void CompileBroker::mark_method_extra_hot(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+#ifdef COMPILER2
+  if (!ExtraHotCodeCache ||
+      comp_level != CompLevel_full_optimization || method->is_native()) {
+    return;
+  }
+
+  bool extra_hot = false;
+  bool extra_hot_dir = directive->ExtraHotOption;
+
+  if (!extra_hot_dir) {
+    extra_hot = (CompilerOracle::has_option_value(method, CompileCommand::ExtraHot, extra_hot) && extra_hot);
+  }
+
+  if (extra_hot || extra_hot_dir) {
+    method->set_extra_hot();
+
+    // Print compilation
+    bool quietly = CompilerOracle::be_quiet();
+    if (PrintCompilation && !quietly) {
+      // This does not happen quietly...
+      ResourceMark rm;
+      tty->print("### ExtraHot %s ", (method->is_static() ? " static" : ""));
+      method->print_short_name(tty);
+      tty->print_cr(" (%s) hot_count %d", (extra_hot_dir) ? "directive" : "command",  hot_count);
+    }
+  }
+#endif
+}
+
 // ------------------------------------------------------------------
 // CompileBroker::compilation_is_complete
 //
@@ -1583,6 +1619,30 @@ bool CompileBroker::compilation_is_complete(const methodHandle& method,
  */
 bool CompileBroker::compilation_is_in_queue(const methodHandle& method) {
   return method->queued_for_compilation();
+}
+
+// Set count_calls flag for methods with option CountCalls
+void CompileBroker::mark_method_count_calls(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+#ifdef COMPILER2
+  (void) hot_count;
+
+  if (comp_level != CompLevel_full_optimization || method->is_native()) {
+    return;
+  }
+
+  bool count_calls = directive->CountCallsOption;
+
+  if (!count_calls) {
+    count_calls = (CompilerOracle::has_option_value(method, CompileCommand::CountCalls, count_calls) && count_calls);
+  }
+
+  if (count_calls) {
+    ResourceMark rm;
+    // Clear the counter on each re-compilation
+    method->set_compiled_invocation_count(0);
+    method->set_count_calls();
+  }
+#endif
 }
 
 // ------------------------------------------------------------------
