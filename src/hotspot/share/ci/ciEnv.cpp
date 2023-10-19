@@ -1052,17 +1052,15 @@ void ciEnv::register_method(ciMethod* target,
       }
 
       if (entry_bci == InvocationEntryBci) {
-        if (TieredCompilation) {
-          // If there is an old version we're done with it
-          CompiledMethod* old = method->code();
-          if (TraceMethodReplacement && old != NULL) {
-            ResourceMark rm;
-            char *method_name = method->name_and_sig_as_C_string();
-            tty->print_cr("Replacing method %s", method_name);
-          }
-          if (old != NULL) {
-            old->make_not_used();
-          }
+        // If there is an old version we're done with it
+        CompiledMethod* old = method->code();
+        if (TraceMethodReplacement && old != NULL) {
+          ResourceMark rm;
+          char *method_name = method->name_and_sig_as_C_string();
+          tty->print_cr("Replacing method %s", method_name);
+        }
+        if (old != NULL) {
+          old->make_not_used();
         }
 
         LogTarget(Info, nmethod, install) lt;

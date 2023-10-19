@@ -269,6 +269,9 @@ class CodeCache : AllStatic {
   static int  mark_for_deoptimization(Method* dependee);
   static void make_marked_nmethods_not_entrant();
 
+  static void mark_directives_matches(bool top_only = false);
+  static void recompile_marked_directives_matches();
+
   // Flushing and deoptimization
   static void flush_dependents_on(InstanceKlass* dependee);
 

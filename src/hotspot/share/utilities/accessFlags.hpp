@@ -58,6 +58,9 @@ enum {
   JVM_ACC_IS_OBSOLETE             = 0x00020000,     // RedefineClasses() has made method obsolete
   JVM_ACC_IS_PREFIXED_NATIVE      = 0x00040000,     // JVMTI has prefixed this native method
   JVM_ACC_ON_STACK                = 0x00080000,     // RedefineClasses() was used on the stack
+  JVM_ACC_RESERVED_DONT_USE1      = 0x00001000,     //
+  JVM_ACC_HAS_MATCHING_DIRECTIVES = 0x00002000,     //
+  JVM_ACC_RESERVED_CAN_USE        = 0x00004000,     // 
   JVM_ACC_IS_DELETED              = 0x00008000,     // RedefineClasses() has deleted this method
 
   // Klass* flags
@@ -144,6 +147,7 @@ class AccessFlags {
   bool is_obsolete             () const { return (_flags & JVM_ACC_IS_OBSOLETE            ) != 0; }
   bool is_deleted              () const { return (_flags & JVM_ACC_IS_DELETED             ) != 0; }
   bool is_prefixed_native      () const { return (_flags & JVM_ACC_IS_PREFIXED_NATIVE     ) != 0; }
+  bool has_matching_directives () const { return (_flags & JVM_ACC_HAS_MATCHING_DIRECTIVES) != 0; }
 
   // Klass* flags
   bool has_miranda_methods     () const { return (_flags & JVM_ACC_HAS_MIRANDA_METHODS    ) != 0; }
@@ -219,10 +223,13 @@ class AccessFlags {
   void set_is_obsolete()               { atomic_set_bits(JVM_ACC_IS_OBSOLETE);             }
   void set_is_deleted()                { atomic_set_bits(JVM_ACC_IS_DELETED);              }
   void set_is_prefixed_native()        { atomic_set_bits(JVM_ACC_IS_PREFIXED_NATIVE);      }
+  void set_has_matching_directives()   { atomic_set_bits(JVM_ACC_HAS_MATCHING_DIRECTIVES); }
 
   void clear_not_c1_compilable()       { atomic_clear_bits(JVM_ACC_NOT_C1_COMPILABLE);       }
   void clear_not_c2_compilable()       { atomic_clear_bits(JVM_ACC_NOT_C2_COMPILABLE);       }
   void clear_not_c2_osr_compilable()   { atomic_clear_bits(JVM_ACC_NOT_C2_OSR_COMPILABLE);   }
+  void clear_has_matching_directives() { atomic_clear_bits(JVM_ACC_HAS_MATCHING_DIRECTIVES); }
+
   // Klass* flags
   void set_has_vanilla_constructor()   { atomic_set_bits(JVM_ACC_HAS_VANILLA_CONSTRUCTOR); }
   void set_has_finalizer()             { atomic_set_bits(JVM_ACC_HAS_FINALIZER);           }

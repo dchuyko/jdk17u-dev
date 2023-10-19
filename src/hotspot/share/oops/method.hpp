@@ -917,6 +917,18 @@ public:
     return _method_counters;
   }
 
+  // Clear the flags related to compiler directives that were set by the compilerBroker,
+  // because the directives can be updated.
+  void clear_method_flags() {
+    clear_has_matching_directives();
+    clear_not_c1_compilable();
+    clear_not_c2_compilable();
+  }
+
+  void set_has_matching_directives()   {        _access_flags.set_has_matching_directives();   }
+  bool has_matching_directives() const { return _access_flags.has_matching_directives();       }
+  void clear_has_matching_directives() {        _access_flags.clear_has_matching_directives(); }
+
   bool   is_not_c1_compilable() const         { return access_flags().is_not_c1_compilable();  }
   void  set_not_c1_compilable()               {       _access_flags.set_not_c1_compilable();   }
   void clear_not_c1_compilable()              {       _access_flags.clear_not_c1_compilable(); }

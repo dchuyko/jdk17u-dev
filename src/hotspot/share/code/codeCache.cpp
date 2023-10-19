@@ -33,6 +33,7 @@
 #include "code/icBuffer.hpp"
 #include "code/nmethod.hpp"
 #include "code/pcDesc.hpp"
+#include "compiler/compilerDirectives.hpp"
 #include "compiler/compilationPolicy.hpp"
 #include "compiler/compileBroker.hpp"
 #include "compiler/oopMap.hpp"
@@ -1168,6 +1169,53 @@ void CodeCache::flush_evol_dependents() {
   Deoptimization::deoptimize_all_marked();
 }
 #endif // INCLUDE_JVMTI
+
+void CodeCache::mark_directives_matches(bool top_only) {
+  MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  Thread *thread = Thread::current();
+  HandleMark hm(thread);
+
+  CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
+  while(iter.next()) {
+    CompiledMethod* nm = iter.method();
+    methodHandle mh(thread, nm->method());
+    if (DirectivesStack::hasMatchingDirectives(mh, top_only)) {
+      ResourceMark rm;
+      log_trace(codecache)("Mark because of matching directives %s", mh->external_name());
+      mh->set_has_matching_directives();
+    }
+  }
+}
+
+void CodeCache::recompile_marked_directives_matches() {
+  Thread *thread = Thread::current();
+  HandleMark hm(thread);
+
+  RelaxedCompiledMethodIterator iter(RelaxedCompiledMethodIterator::only_alive_and_not_unloading);
+  while(iter.next()) {
+    CompiledMethod* nm = iter.method();
+    methodHandle mh(thread, nm->method());
+    if (mh->has_matching_directives()) {
+      ResourceMark rm;
+      // Try the max level and let the directives be applied during the compilation.
+      int complevel = CompLevel::CompLevel_full_optimization;
+
+      mh->clear_method_flags();
+      log_trace(codecache)("Recompile to level %d because of matching directives %s", complevel, mh->external_name());
+      nmethod * comp_nm = CompileBroker::compile_method(mh, InvocationEntryBci, complevel,
+                                      methodHandle(), 0, CompileTask::Reason_DirectivesChanged, (JavaThread *)thread);
+      // For some reason the method cannot be compiled by C2, e.g. the new directives forbid it.
+      // Deoptimize the method and let the usual hotspot logic do the rest.
+      if (comp_nm == nullptr) {
+        log_trace(codecache)("Recompilation to level %d failed, go deopt %s", complevel, mh->external_name());
+        if (nm->can_be_deoptimized()) {
+          nm->make_not_entrant();
+        }
+      }
+      NMethodSweeper::report_allocation(); // Flush unused methods from CodeCache if required.
+    }
+  }
+}
 
 // Mark methods for deopt (if safe or possible).
 void CodeCache::mark_all_nmethods_for_deoptimization() {

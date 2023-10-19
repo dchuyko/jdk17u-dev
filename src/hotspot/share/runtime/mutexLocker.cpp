@@ -293,7 +293,7 @@ void mutex_init() {
   def(CompiledIC_lock              , PaddedMutex  , nonleaf+2,   false, _safepoint_check_never);      // locks VtableStubs_lock, InlineCacheBuffer_lock
   def(CompileTaskAlloc_lock        , PaddedMutex  , nonleaf+2,   true,  _safepoint_check_always);
   def(CompileStatistics_lock       , PaddedMutex  , nonleaf+2,   false, _safepoint_check_always);
-  def(DirectivesStack_lock         , PaddedMutex  , special,     true,  _safepoint_check_never);
+  def(DirectivesStack_lock         , PaddedMutex  , special-1,   true,  _safepoint_check_never);  // Should be allowed to take under CodeCache_lock
   def(MultiArray_lock              , PaddedMutex  , nonleaf+2,   false, _safepoint_check_always);
 
   def(JvmtiThreadState_lock        , PaddedMutex  , nonleaf+2,   false, _safepoint_check_always); // Used by JvmtiThreadState/JvmtiEventController
