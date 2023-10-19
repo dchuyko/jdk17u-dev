@@ -1579,7 +1579,8 @@ bool CompileBroker::compilation_is_in_queue(const methodHandle& method) {
 // Set hot flag for methods marked by the compiler directive or option as Hot
 void CompileBroker::mark_method_hot(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
 #ifdef COMPILER2
-  if (comp_level != CompLevel_full_optimization || method->is_native()) {
+  if (!HotCodeHeap ||
+      comp_level != CompLevel_full_optimization || method->is_native()) {
     return;
   }
 

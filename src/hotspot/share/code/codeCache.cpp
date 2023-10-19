@@ -198,6 +198,7 @@ void CodeCache::initialize_heaps() {
   CodeCacheSegment non_nmethod = {NonNMethodCodeHeapSize, FLAG_IS_CMDLINE(NonNMethodCodeHeapSize), true};
   CodeCacheSegment profiled = {ProfiledCodeHeapSize, FLAG_IS_CMDLINE(ProfiledCodeHeapSize), true};
   CodeCacheSegment non_profiled = {NonProfiledCodeHeapSize, FLAG_IS_CMDLINE(NonProfiledCodeHeapSize), true};
+  CodeCacheSegment hot = {HotCodeHeapSize, FLAG_IS_CMDLINE(HotCodeHeapSize), HotCodeHeap};
 
   bool cache_size_set       = FLAG_IS_CMDLINE(ReservedCodeCacheSize);
   size_t cache_size         = ReservedCodeCacheSize;
@@ -227,6 +228,11 @@ void CodeCache::initialize_heaps() {
     non_profiled.enabled = false;
   }
 
+  if (!hot.enabled) {
+    hot.size = 0;
+    hot.set = true;
+  }
+
 // Code below account enabled/disabled compilators
 // inside CompilationPolicy::initialize()
 #ifdef COMPILER1
@@ -246,26 +252,27 @@ void CodeCache::initialize_heaps() {
   }
 
   if (!profiled.set && !non_profiled.set) {
-    profiled.size = (non_nmethod.size < cache_size && (cache_size - non_nmethod.size)/2 > min_size) ? (cache_size - non_nmethod.size)/2 : min_size;
+    size_t cold_cache_size = cache_size - hot.size;
+    profiled.size = (non_nmethod.size < cold_cache_size && (cold_cache_size - non_nmethod.size)/2 > min_size) ? (cold_cache_size - non_nmethod.size)/2 : min_size;
     non_profiled.size = profiled.size;
   }
 
   if (profiled.set && !non_profiled.set) {
-    non_profiled.size = safe_size(non_nmethod.size + profiled.size, cache_size, min_size);
+    non_profiled.size = safe_size(non_nmethod.size + profiled.size + hot.size, cache_size, min_size);
   }
 
   if (!profiled.set && non_profiled.set) {
-    profiled.size = safe_size(non_nmethod.size + non_profiled.size, cache_size, min_size);
+    profiled.size = safe_size(non_nmethod.size + non_profiled.size + hot.size, cache_size, min_size);
   }
 
   // Compatibility.
   // Override Non-NMethod default size if two other segments are set explicitly
   size_t nm_min_size = min_cache_size + compiler_buffer_size;
   if (!non_nmethod.set && profiled.set && non_profiled.set) {
-    non_nmethod.size = safe_size(profiled.size + non_profiled.size, cache_size, nm_min_size);
+    non_nmethod.size = safe_size(profiled.size + non_profiled.size + hot.size, cache_size, nm_min_size);
   }
 
-  size_t total = non_nmethod.size + profiled.size + non_profiled.size;
+  size_t total = non_nmethod.size + hot.size + profiled.size + non_profiled.size;
   if (!cache_size_set && (total > cache_size || total != cache_size)) {
     log_info(codecache)("ReservedCodeCache size %lld changed to total segments size NonNMethod %lld NonProfiled %lld Profiled %lld = %lld",
                         (long long) cache_size, (long long) non_nmethod.size,
@@ -353,6 +360,13 @@ void CodeCache::initialize_heaps() {
   // Non-nmethods (stubs, adapters, ...)
   add_heap(non_method_space, "CodeHeap 'non-nmethods'", CodeBlobType::NonNMethod);
 
+  if (hot.enabled) {
+    ReservedSpace hot_space  = rs.partition(offset, hot.size);
+    offset += hot.size;
+    // Hot methods
+    add_heap(hot_space, "CodeHeap 'hot nmethods'", CodeBlobType::MethodHot);
+  }
+
   if (non_profiled.enabled) {
     ReservedSpace non_profiled_space  = rs.partition(offset, non_profiled.size);
     // Tier 1 and tier 4 (non-profiled) methods and native methods
@@ -392,6 +406,10 @@ ReservedCodeSpace CodeCache::reserve_heap_memory(size_t size, size_t rs_ps) {
 
 // Heaps available for allocation
 bool CodeCache::heap_available(int code_blob_type) {
+  if (!HotCodeHeap && code_blob_type == CodeBlobType::MethodHot) {
+    return false;
+  }
+
   if (!SegmentedCodeCache) {
     // No segmentation: use a single code heap
     return (code_blob_type == CodeBlobType::All);
@@ -402,9 +420,9 @@ bool CodeCache::heap_available(int code_blob_type) {
     // Tiered compilation: use all code heaps
     return (code_blob_type < CodeBlobType::All);
   } else {
-    // No TieredCompilation: we only need the non-nmethod and non-profiled code heap
-    return (code_blob_type == CodeBlobType::NonNMethod) ||
-           (code_blob_type == CodeBlobType::MethodNonProfiled);
+   return (code_blob_type == CodeBlobType::MethodHot) ||
+          (code_blob_type == CodeBlobType::NonNMethod) ||
+          (code_blob_type == CodeBlobType::MethodNonProfiled);
   }
 }
 
@@ -419,9 +437,13 @@ const char* CodeCache::get_code_heap_flag_name(int code_blob_type) {
   case CodeBlobType::MethodProfiled:
     return "ProfiledCodeHeapSize";
     break;
+  case CodeBlobType::MethodHot:
+    return "HotCodeHeapSize";
+    break;
+  default:
+    ShouldNotReachHere();
+    return NULL;
   }
-  ShouldNotReachHere();
-  return NULL;
 }
 
 int CodeCache::code_heap_compare(CodeHeap* const &lhs, CodeHeap* const &rhs) {
@@ -539,7 +561,7 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
 
   // Get CodeHeap for the given CodeBlobType
   CodeHeap* heap = get_code_heap(code_blob_type);
-  assert(heap != NULL, "heap is null");
+  assert(heap != nullptr, "No heap for given code_blob_type %d, heap is null", (int) code_blob_type);
 
   while (true) {
     cb = (CodeBlob*)heap->allocate(size);
@@ -557,6 +579,10 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
         // and force stack scanning if less than 10% of the entire code cache are free.
         int type = code_blob_type;
         switch (type) {
+        case CodeBlobType::MethodHot:
+          log_info(codecache, hot)("Hot segment is full. Fallback to NonProfiled heap.");
+          type = CodeBlobType::MethodNonProfiled;
+          break;
         case CodeBlobType::NonNMethod:
           type = CodeBlobType::MethodNonProfiled;
           break;
@@ -571,6 +597,9 @@ CodeBlob* CodeCache::allocate(int size, int code_blob_type, bool handle_alloc_fa
           break;
         }
         if (type != code_blob_type && type != orig_code_blob_type && heap_available(type)) {
+          log_info(codecache)("Allocation in %s failed. Fallback to %s heap.",
+                          heap->name(), get_code_heap(type)->name());
+
           if (PrintCodeCacheExtension) {
             tty->print_cr("Extension of %s failed. Trying to allocate in %s.",
                           heap->name(), get_code_heap(type)->name());
@@ -1430,7 +1459,14 @@ void CodeCache::print_trace(const char* event, CodeBlob* cb, int size) {
   if (PrintCodeCache2) {  // Need to add a new flag
     ResourceMark rm;
     if (size == 0)  size = cb->size();
-    tty->print_cr("CodeCache %s:  addr: " INTPTR_FORMAT ", size: 0x%x", event, p2i(cb), size);
+    tty->print("CodeCache %s:  addr: " INTPTR_FORMAT ", size: 0x%x", event, p2i(cb), size);
+    FOR_ALL_HEAPS(heap) {
+      CodeHeap* curr_heap = *heap;
+      if (curr_heap->contains(cb)) {
+        tty->print(" heap: %s", curr_heap->name());
+      }
+    }
+    tty->cr();
   }
 }
 
