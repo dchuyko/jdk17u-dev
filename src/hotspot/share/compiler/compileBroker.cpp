@@ -1410,6 +1410,7 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
     return NULL;
   }
 
+  mark_method_hot(method, comp_level, hot_count, directive);
 #if INCLUDE_JVMCI
   if (comp->is_jvmci() && !JVMCI::can_initialize_JVMCI()) {
     return NULL;
@@ -1573,6 +1574,36 @@ bool CompileBroker::compilation_is_complete(const methodHandle& method,
  */
 bool CompileBroker::compilation_is_in_queue(const methodHandle& method) {
   return method->queued_for_compilation();
+}
+
+// Set hot flag for methods marked by the compiler directive or option as Hot
+void CompileBroker::mark_method_hot(const methodHandle& method, int comp_level, int hot_count, DirectiveSet* directive) {
+#ifdef COMPILER2
+  if (comp_level != CompLevel_full_optimization || method->is_native()) {
+    return;
+  }
+
+  bool hot = false;
+  bool hot_dir = directive->HotOption;
+
+  if (!hot_dir) {
+    hot = (CompilerOracle::has_option_value(method, CompileCommand::Hot, hot) && hot);
+  }
+
+  if (hot || hot_dir) {
+    method->set_is_hot();
+
+    // Print compilation
+    bool quietly = CompilerOracle::be_quiet();
+    if (PrintCompilation && !quietly) {
+      // This does not happen quietly...
+      ResourceMark rm;
+      tty->print("### Hot %s ", (method->is_static() ? " static" : ""));
+      method->print_short_name(tty);
+      tty->print_cr(" (%s)", (hot_dir) ? "directive" : "command");
+    }
+  }
+#endif
 }
 
 // ------------------------------------------------------------------

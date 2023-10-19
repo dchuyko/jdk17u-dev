@@ -921,9 +921,14 @@ public:
   // because the directives can be updated.
   void clear_method_flags() {
     clear_has_matching_directives();
+    clear_is_hot();
     clear_not_c1_compilable();
     clear_not_c2_compilable();
   }
+
+  void set_is_hot()              {       _access_flags.set_is_hot();   }
+  bool is_hot() const            { return access_flags().is_hot();     }
+  void clear_is_hot()            {       _access_flags.clear_is_hot(); }
 
   void set_has_matching_directives()   {        _access_flags.set_has_matching_directives();   }
   bool has_matching_directives() const { return _access_flags.has_matching_directives();       }
