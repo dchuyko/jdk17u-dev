@@ -80,7 +80,7 @@ class ShenandoahParallelCodeHeapIterator;
 class CodeCache : AllStatic {
   friend class VMStructs;
   friend class JVMCIVMStructs;
-  template <class T, class Filter> friend class CodeBlobIterator;
+  template <class T, class Filter, bool is_relaxed> friend class CodeBlobIterator;
   friend class WhiteBox;
   friend class CodeCacheLoader;
   friend class ShenandoahParallelCodeHeapIterator;
@@ -305,8 +305,9 @@ class CodeCache : AllStatic {
 };
 
 
-// Iterator to iterate over nmethods in the CodeCache.
-template <class T, class Filter> class CodeBlobIterator : public StackObj {
+// Iterator to iterate over code blobs in the CodeCache.
+// The relaxed iterators only hold the CodeCache_lock across next calls
+template <class T, class Filter, bool is_relaxed> class CodeBlobIterator : public StackObj {
  public:
   enum LivenessFilter { all_blobs, only_alive, only_alive_and_not_unloading };
 
@@ -317,30 +318,10 @@ template <class T, class Filter> class CodeBlobIterator : public StackObj {
   bool _only_alive;
   bool _only_not_unloading;
 
- public:
-  CodeBlobIterator(LivenessFilter filter, T* nm = NULL)
-    : _only_alive(filter == only_alive || filter == only_alive_and_not_unloading),
-      _only_not_unloading(filter == only_alive_and_not_unloading)
-  {
-    if (Filter::heaps() == NULL) {
-      return;
-    }
-    _heap = Filter::heaps()->begin();
-    _end = Filter::heaps()->end();
-    // If set to NULL, initialized by first call to next()
-    _code_blob = (CodeBlob*)nm;
-    if (nm != NULL) {
-      while(!(*_heap)->contains_blob(_code_blob)) {
-        ++_heap;
-      }
-      assert((*_heap)->contains_blob(_code_blob), "match not found");
-    }
+  void initialize_iteration(T* nm) {
   }
 
-  // Advance iterator to next blob
-  bool next() {
-    assert_locked_or_safepoint(CodeCache_lock);
-
+  bool next_impl() {
     for (;;) {
       // Walk through heaps as required
       if (!next_blob()) {
@@ -368,7 +349,42 @@ template <class T, class Filter> class CodeBlobIterator : public StackObj {
     }
   }
 
-  bool end()  const { return _code_blob == NULL; }
+ public:
+  CodeBlobIterator(LivenessFilter filter, T* nm = nullptr)
+    : _only_alive(filter == only_alive || filter == only_alive_and_not_unloading),
+      _only_not_unloading(filter == only_alive_and_not_unloading)
+  {
+    if (Filter::heaps() == nullptr) {
+      // The iterator is supposed to shortcut since we have
+      // _heap == _end, but make sure we do not have garbage
+      // in other fields as well.
+      _code_blob = nullptr;
+      return;
+    }
+    _heap = Filter::heaps()->begin();
+    _end = Filter::heaps()->end();
+    // If set to nullptr, initialized by first call to next()
+    _code_blob = nm;
+    if (nm != nullptr) {
+      while(!(*_heap)->contains(_code_blob)) {
+        ++_heap;
+      }
+      assert((*_heap)->contains(_code_blob), "match not found");
+    }
+  }
+
+  // Advance iterator to next blob
+  bool next() {
+    if (is_relaxed) {
+      MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+      return next_impl();
+    } else {
+      assert_locked_or_safepoint(CodeCache_lock);
+      return next_impl();
+    }
+  }
+
+  bool end()  const { return _code_blob == nullptr; }
   T* method() const { return (T*)_code_blob; }
 
 private:
@@ -414,8 +430,9 @@ struct AllCodeBlobsFilter {
   static const GrowableArray<CodeHeap*>* heaps() { return CodeCache::heaps(); }
 };
 
-typedef CodeBlobIterator<CompiledMethod, CompiledMethodFilter> CompiledMethodIterator;
-typedef CodeBlobIterator<nmethod, NMethodFilter> NMethodIterator;
-typedef CodeBlobIterator<CodeBlob, AllCodeBlobsFilter> AllCodeBlobsIterator;
+typedef CodeBlobIterator<CompiledMethod, CompiledMethodFilter, false /* is_relaxed */> CompiledMethodIterator;
+typedef CodeBlobIterator<CompiledMethod, CompiledMethodFilter, true /* is_relaxed */> RelaxedCompiledMethodIterator;
+typedef CodeBlobIterator<nmethod, NMethodFilter, false /* is_relaxed */> NMethodIterator;
+typedef CodeBlobIterator<CodeBlob, AllCodeBlobsFilter, false /* is_relaxed */> AllCodeBlobsIterator;
 
 #endif // SHARE_CODE_CODECACHE_HPP
